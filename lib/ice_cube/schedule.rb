@@ -19,6 +19,9 @@ module IceCube
       self.start_time = start_time || TimeUtil.now
       self.end_time = self.start_time + options[:duration] if options[:duration]
       self.end_time = options[:end_time] if options[:end_time]
+
+      @ignore_recurrence_times_from_counting = options[:ignore_recurrence_times_from_counting] || false
+
       @all_recurrence_rules = []
       @all_exception_rules = []
       yield self if block_given?
@@ -417,6 +420,7 @@ module IceCube
         reset
         t1 = full_required? ? start_time : opening_time - (spans ? duration : 0)
         loop do
+          t1 = @prev_time || t1
           break unless (t0 = next_time(t1, closing_time))
           break if closing_time && t0 > closing_time
           if (spans ? (t0.end_time > opening_time) : (t0 >= opening_time))
@@ -441,7 +445,18 @@ module IceCube
       loop do
         min_time = recurrence_rules_with_implicit_start_occurrence.reduce(nil) do |min_time, rule|
           begin
+            if @ignore_recurrence_times_from_counting && rule.is_a?(IceCube::SingleOccurrenceRule) && @prev_time
+              @prev_time = nil
+
+              next min_time
+            end
+
             new_time = rule.next_time(time, start_time, min_time || closing_time)
+
+            if @ignore_recurrence_times_from_counting && rule.is_a?(IceCube::SingleOccurrenceRule) && new_time && min_time.to_i > new_time.to_i
+              @prev_time = min_time
+            end
+
             [min_time, new_time].compact.min
           rescue StopIteration
             min_time
