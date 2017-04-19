@@ -1,5 +1,7 @@
 require File.dirname(__FILE__) + '/../spec_helper'
 
+require 'active_support/time'
+
 module IceCube
   describe WeeklyRule, 'interval validation' do
     it 'converts a string integer to an actual int when using the interval method' do
@@ -244,5 +246,54 @@ module IceCube
       end
     end
 
+    describe "occurrences_between with a weekly schedule and a single time occurence" do
+      let!(:recurrence_rule) do
+          r = IceCube::WeeklyRule.new(10, :sunday)
+          r.replace_validations_for(
+            :day, [
+              IceCube::Validations::Day::Validation.new(1),
+              IceCube::Validations::Day::Validation.new(3)
+            ]
+          )
+          r.replace_validations_for(:base_wday, nil)
+          r
+      end
+
+      let(:time_zone) { "UTC" }
+      let(:exception_times) { [Time.zone.parse("2017-06-05T15:45:00Z"), Time.zone.parse("2017-06-07T15:45:00Z")] }
+      let(:recurrence_times) { [Time.zone.parse("2017-06-19T15:45:00Z")] }
+      let(:start_time) { Time.zone.parse("2016-11-09T15:45:00Z") }
+      let(:ocurrences_date_from) { Time.zone.parse("2017-04-18T15:45:00Z") }
+
+      before do
+        Time.zone = time_zone
+      end
+
+      context 'default behaviour' do
+        it 'should not contain 14th of August' do
+          sched = IceCube::Schedule.new
+          sched.add_recurrence_rule(recurrence_rule)
+          exception_times.each  { |et| sched.add_exception_time(et.in_time_zone(time_zone)) }
+          recurrence_times.each { |et| sched.add_recurrence_time(et.in_time_zone(time_zone)) }
+          sched.start_time = start_time.in_time_zone(time_zone)
+          ocurrences = sched.occurrences_between(ocurrences_date_from, ocurrences_date_from +  6.months).map { |o| o.in_time_zone(Time.zone) }.map(&:utc)
+
+          expect(ocurrences).not_to include(Time.zone.parse("2017-08-14T15:45:00Z"))
+        end
+      end
+
+      context "ignore_recurrence_times_from_counting flag true" do
+        it 'should contain 14th of August' do
+          sched = IceCube::Schedule.new(nil, ignore_recurrence_times_from_counting: true)
+          sched.add_recurrence_rule(recurrence_rule)
+          exception_times.each  { |et| sched.add_exception_time(et.in_time_zone(time_zone)) }
+          recurrence_times.each { |et| sched.add_recurrence_time(et.in_time_zone(time_zone)) }
+          sched.start_time = start_time.in_time_zone(time_zone)
+          ocurrences = sched.occurrences_between(ocurrences_date_from, ocurrences_date_from +  6.months).map { |o| o.in_time_zone(Time.zone) }.map(&:utc)
+
+          expect(ocurrences).to include(Time.zone.parse("2017-08-14T15:45:00Z"))
+        end
+      end
+    end
   end
 end
