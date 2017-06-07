@@ -1,5 +1,7 @@
 require File.dirname(__FILE__) + '/../spec_helper'
 
+require 'active_support/time'
+
 module IceCube
   describe MonthlyRule, 'interval validation' do
     it 'converts a string integer to an actual int when using the interval method' do
@@ -149,6 +151,25 @@ module IceCube
         Time.utc(2013, 3, 31),
         Time.utc(2013, 5, 31)
       ])
+    end
+    
+    it '' do
+      Time.zone = "UTC"
+      
+      # r = IceCube::MonthlyRule.new(1, :sunday)
+      r = Rule.monthly.day_of_month(5)
+      # r.replace_validations_for(:day_of_month, [IceCube::Validations::Day::Validation.new(5)])
+      # r.replace_validations_for(:base_wday, nil)
+
+      ocurrences_date_from = Time.zone.parse('Fri, 05 May 2017 19:11:17 UTC +00:00')
+      schedule = IceCube::Schedule.new
+      schedule.add_recurrence_rule r
+      schedule.start_time = Time.zone.parse("Wed, 05 Oct 2016 09:00:00 UTC +00:00").in_time_zone('America/Nome')
+      
+      rrules = schedule.instance_variable_get :@all_recurrence_rules
+      p rrules.count
+      p rrules.first
+      p schedule.occurrences_between(ocurrences_date_from, ocurrences_date_from +  6.months)
     end
 
     def month_interval(current_date, last_date)
